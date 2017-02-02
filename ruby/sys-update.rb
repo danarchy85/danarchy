@@ -44,7 +44,8 @@ class Location
   end
 
   def targethost
-    '10.0.1.13' if @connection == true
+    puts "Connection = #{@connection}"
+    return '10.0.1.13' if @connection == true
     'danarchy.me'
   end
 end
@@ -85,9 +86,9 @@ class Emerge
 end
 
 class NFS
-  def mount_nfs
-    puts "Mounting: #{@targethost}:/usr/portage"
-    system("mount -t nfs #{@targethost}:/usr/portage /usr/portage")
+  def mount_nfs(targethost)
+    puts "Mounting: #{targethost}:/usr/portage"
+    system("mount -t nfs #{targethost}:/usr/portage /usr/portage")
   end
 
   def umount_nfs
@@ -102,21 +103,21 @@ if __NAME__ = $PROGRAM_NAME
 
   emerge_cmd = ARGV.shift
   
-  l = Location.new
-  localhost = l.localhost
-  targethost = l.targethost
+  loc = Location.new
+  localhost = loc.localhost
+  targethost = loc.targethost
 
   e = Emerge.new targethost, options
   n = NFS.new
   
   if localhost == 'danarchy'
-    print "Localhost is #{localhost}"
+    puts "Localhost is #{localhost}"
     e.emerge_sync if options[:sync]
     e.emerge
     e.depclean
-  elsif @targethost == '10.0.1.13'
+  elsif targethost == '10.0.1.13'
     puts "#{localhost} is within dAnarchy network"
-    n.mount_nfs
+    n.mount_nfs(targethost)
     e.emerge
     e.depclean
     n.umount_nfs
