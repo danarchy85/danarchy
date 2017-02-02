@@ -5,8 +5,7 @@ require 'open3'
 options = {}
 
 OptionParser.new do |opts|
-
-  opts.banner = "Usage: #{$0} [status|start|stop]"
+  opts.banner = "Usage: #{$PROGRAM_NAME} [status|start|stop]"
 
   opts.on('--status', 'View Status of Running Redmine') do
     options[:action] = 'status'
@@ -32,9 +31,9 @@ OptionParser.new do |opts|
     puts opts
     exit
   end
-
 end.parse!
 
+# Redmine Init Handler
 class Redmine
   def initialize
     user = 'redmine'
@@ -42,17 +41,19 @@ class Redmine
     @app_path = "/home/#{user}/#{app}"
     @pidfile = "#{@app_path}/tmp/pids/puma.pid"
   end
-  
+
   def status
-    pid = File.read(@pidfile).chomp if File.exists?(@pidfile)
-    return false unless File.exists?(@pidfile) && File.exists?("/proc/#{pid}/status")
+    pid = File.read(@pidfile).chomp if File.exist?(@pidfile)
+    return false unless File.exist?(@pidfile) && File.exist?("/proc/#{pid}/status")
     pidstatus = {}
     File.open("/proc/#{pid}/status").each do |sl|
-      k = sl.split(' ')[0].sub(':','')
-      v = sl.split(' ')[1].sub(':','')
+      k = sl.split(' ')[0].sub(':', '')
+      v = sl.split(' ')[1].sub(':', '')
       pidstatus[:"#{k}"] = v
     end
 
+    puts 'Redmine is not running' if !pidstatus
+    puts "Redmine is running as PID: #{pidstatus[:Pid]}" if pidstatus
     return pidstatus if pidstatus[:Pid] == pid
   end
 
@@ -65,21 +66,25 @@ class Redmine
       puts 'Waiting while Redmine starts...'
       sleep(15)
       pidstatus = status
-      puts "Redmine is running as PID: #{pidstatus[:Pid]}"
-    else
-      puts "Redmine is running as PID: #{pidstatus[:Pid]}"
     end
+
+    return 1 unless pidstatus
   end
 
   def stop
     pidstatus = status
-    return puts 'Redmine is not running' if pidstatus == false
+    return if !pidstatus
     pid = pidstatus[:Pid]
     puts "Stopping Redmine PID: #{pid}..."
     exec_stop = IO.popen("kill #{pid}")
     exec_stop.each { |exec| puts exec }
     sleep(3)
-    puts "Redmine PID: #{pid} has stopped" if status == false
+    if status == false
+      puts "Redmine PID: #{pid} has stopped"
+    else
+      puts "Redmine PID: #{pid} is still running!"
+      return 1
+    end
   end
 
   def restart
@@ -95,11 +100,6 @@ puts "Redmine: #{options[:action]}"
 
 if options[:action] == 'status'
   pidstatus = r.status
-  if pidstatus == false
-    puts "Redmine is not running"
-  else
-    puts "Redmine is running PID: #{pidstatus[:Pid]}"
-  end
 elsif options[:action] == 'start'
   r.start
 elsif options[:action] == 'stop'
@@ -108,7 +108,5 @@ elsif options[:action] == 'restart'
   r.restart
 elsif options[:action] == 'keeprunning'
   pidstatus = r.status
-  if pidstatus == false
-    r.restart
-  end
+  r.restart if pidstatus == false
 end
