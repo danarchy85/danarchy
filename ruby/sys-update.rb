@@ -2,6 +2,13 @@
 require 'optparse'
 require 'socket'
 
+server_vars = {
+  server_hostname: 'server_hostname',
+  server_domain: 'server_domain',
+  server_lan_ip: 'server_lan_ip',
+  server_user: 'server_user',
+}
+
 options = {
   ask: true,
   sync: true,
@@ -9,7 +16,7 @@ options = {
 }
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: sudo #{$0} [options]"
+  opts.banner = "Usage: sudo #{$PROGRAM_NAME} [options]"
 
   opts.on('-i', '--insist', "Don't --ask") do |value|
     options[:ask] == false
@@ -30,9 +37,10 @@ OptionParser.new do |opts|
 end.parse!
 
 class Location
-  def initialize
+  def initialize(server_vars)
+    @server_vars = server_vars
     begin
-      Socket.tcp("10.0.1.13", 22, connect_timeout: 5)
+      Socket.tcp(@server_vars[:server_lan_ip], 22, connect_timeout: 5)
       @connection = true
     rescue Errno::ETIMEDOUT, Errno::ECONNREFUSED, Errno::EHOSTUNREACH
       @connection = false
@@ -44,15 +52,19 @@ class Location
   end
 
   def targethost
-    puts "Connection = #{@connection}"
-    return '10.0.1.13' if @connection == true
-    'danarchy.me'
+    return @server_vars[:server_lan_ip] if @connection == true
+    @server_vars[:server_domain]
+  end
+
+  def targetuser
+    @server_vars[:server_user]
   end
 end
 
 class Emerge
-  def initialize(targethost, options)
+  def initialize(targethost, targetuser, options)
     @targethost = targethost
+    @targetuser = targetuser
     global_opts = []
     global_opts.push('--ask') if options[:ask]
     global_opts.push('--verbose') if options[:verbose]
@@ -68,8 +80,8 @@ class Emerge
 
   def rsync
     rsync_opts = %Q[--recursive --links --perms --times --devices --delete --timeout=300 --exclude=distfiles/ --exclude=packages/]
-    puts "Running: rsync #{rsync_opts} #{@rsync_opts} dan@#{@targethost}:/usr/portage /usr/portage"
-    system("rsync #{@rsync_opts} #{rsync_opts} dan@#{@targethost}:/usr/portage/ /usr/portage/")
+    puts "Running: rsync #{rsync_opts} #{@rsync_opts} #{@targetuser}@#{@targethost}:/usr/portage /usr/portage"
+    system("rsync #{@rsync_opts} #{rsync_opts} #{@targetuser}@#{@targethost}:/usr/portage/ /usr/portage/")
   end
 
   def emerge
@@ -102,27 +114,28 @@ if __NAME__ = $PROGRAM_NAME
   raise 'Must run with sudo' unless Process.uid == 0
 
   emerge_cmd = ARGV.shift
-  
-  loc = Location.new
+
+  loc = Location.new server_vars
   localhost = loc.localhost
   targethost = loc.targethost
-
-  e = Emerge.new targethost, options
+  targetuser = loc.targetuser
+  
+  e = Emerge.new targethost, targetuser, options
   n = NFS.new
   
-  if localhost == 'danarchy'
+  if localhost == server_vars[:server_hostname]
     puts "Localhost is #{localhost}"
     e.emerge_sync if options[:sync]
     e.emerge
     e.depclean
-  elsif targethost == '10.0.1.13'
-    puts "#{localhost} is within dAnarchy network"
+  elsif targethost == server_vars[:server_lan_ip]
+    puts "#{localhost} is within the network"
     n.mount_nfs(targethost)
     e.emerge
     e.depclean
     n.umount_nfs
   else
-    puts "#{localhost} is outside of dAnarchy network"
+    puts "#{localhost} is outside of the network"
     e.rsync unless !options[:sync]
     e.emerge
     e.depclean
