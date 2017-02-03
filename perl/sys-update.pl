@@ -3,17 +3,20 @@ use warnings;
 use strict;
 use Getopt::Long;
 
-my $quiet;
-my $skip_rsync;
+my ($host, $quiet, $skip_rsync, $rsync_options);
+my $path = "/usr/portage/";
+
+my %server_vars = (
+    server_hostname => 'server_hostname',
+    server_domain   => 'server_domain',
+    server_lan_ip   => 'server_lan_ip',
+    server_user     => 'server_user',
+    );
 
 GetOptions(
     'quiet' => \$quiet,
     'skip_rsync' => \$skip_rsync
 );
-
-my $rsync_options;
-my $path = "/usr/portage/";
-my $host;
 
 location();
 
@@ -27,14 +30,13 @@ sub location {
 #    print "Local IP : $ip\n";
 
     if ( $ip =~ /^10.0.1/ ) {
-	print "Rsyncing repo from : 10.0.1.13\n";
-	$host = "10.0.1.13";
+	$host = $server_vars{'server_lan_ip'}
     } else {
-	print "Rsyncing repo from : danarchy.me\n";
-	$host = "danarchy.me";
+	$host = $server_vars{'server_domain'}
     }
+
     
-    unless ($skip_rsync) { rsync() };
+    unless ($skip_rsync) { print "Rsyncing repo from : $host\n"; rsync(); };
     emerge();
     
 }
@@ -43,6 +45,7 @@ sub rsync {
 
     my $options = "";
     my $verbose = "--verbose";
+    my $user = $server_vars{'server_user'}
     if ($quiet) {
 	$rsync_options = "--recursive --links --perms --times --devices --delete --timeout=300 --exclude=distfiles/";
     } else {
@@ -50,7 +53,7 @@ sub rsync {
     }
 
     print "Rsyncing portage repo from $host to $path\n";
-    my $rsync = "sudo rsync $rsync_options dan\@$host:$path $path";
+    my $rsync = "sudo rsync $rsync_options $user\@$host:$path $path";
     system($rsync);
     return;
     
