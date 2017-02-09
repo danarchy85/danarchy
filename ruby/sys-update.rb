@@ -18,8 +18,8 @@ options = {
 OptionParser.new do |opts|
   opts.banner = "Usage: sudo #{$PROGRAM_NAME} [options]"
 
-  opts.on('-i', '--insist', "Don't --ask") do |value|
-    options[:ask] == false
+  opts.on('-i', '--insist', 'Dont --ask') do |value|
+    options[:ask] = false
   end
 
   opts.on('-q', '--quiet', 'Non verbose output') do |value|
