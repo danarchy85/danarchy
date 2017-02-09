@@ -3,10 +3,10 @@ require 'optparse'
 require 'socket'
 
 server_vars = {
-  server_hostname: 'server_hostname',
-  server_domain: 'server_domain',
-  server_lan_ip: 'server_lan_ip',
-  server_user: 'server_user',
+  server_hostname: 'danarchy',
+  server_domain: 'danarchy.me',
+  server_lan_ip: '10.0.1.13',
+  server_user: 'dan',
 }
 
 options = {
@@ -18,8 +18,8 @@ options = {
 OptionParser.new do |opts|
   opts.banner = "Usage: sudo #{$PROGRAM_NAME} [options]"
 
-  opts.on('-i', '--insist', "Don't --ask") do |value|
-    options[:ask] == false
+  opts.on('-i', '--insist', 'Dont --ask') do |value|
+    options[:ask] = false
   end
 
   opts.on('-q', '--quiet', 'Non verbose output') do |value|
