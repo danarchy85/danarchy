@@ -104,8 +104,10 @@ class NFS
   end
 
   def umount_nfs
-    puts "Unmounting: /usr/portage"
-    system('umount /usr/portage')
+    unless File.read('/etc/fstab').include?('/usr/portage')
+      puts "Unmounting: /usr/portage"
+      system('umount /usr/portage')
+    end
   end
 end
 
