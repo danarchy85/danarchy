@@ -3,38 +3,42 @@ require 'optparse'
 require 'socket'
 
 server_vars = {
-  server_hostname: 'server_hostname',
-  server_domain: 'server_domain',
-  server_lan_ip: 'server_lan_ip',
-  server_user: 'server_user',
+  server_hostname: 'danarchy',
+  server_domain: 'danarchy.me',
+  server_lan_ip: '10.0.1.13',
+  server_user: 'dan',
+  sys_update_path: '/danarchy/ruby/sys-update.rb',
 }
 
 options = {
   ask: true,
   sync: true,
+  local: false,
+  public: false,
   verbose: true,
 }
 
-OptionParser.new do |opts|
-  opts.banner = "Usage: sudo #{$PROGRAM_NAME} [options]"
-
-  opts.on('-i', '--insist', 'Dont --ask') do |value|
-    options[:ask] = false
+class SysUpdate
+  def self.version
+    version = '1.2.3'
   end
+  
+  def self.version_update(server_vars)
+    ssh_key = File.join('/home', server_vars[:server_user], '/.ssh/id_ed25519')
+    @connection = "#{server_vars[:server_user]}@#{server_vars[:server_domain]}"
+    @sys_update_path = server_vars[:sys_update_path]
+    latest = `ssh -i #{ssh_key} #{@connection} /usr/bin/ruby #{@sys_update_path} --version`
 
-  opts.on('-q', '--quiet', 'Non verbose output') do |value|
-    options[:verbose] = false
+    puts "Current version: #{version}"
+    puts "Latest version: #{latest}"
+    if Gem::Version.new(latest) > Gem::Version.new(version)
+      print "Updating #{File.basename(__FILE__)}:#{version} to #{latest}\n"
+      bindir = File.dirname(__FILE__)
+      download = "scp -i #{ssh_key} #{@connection}:#{@sys_update_path} #{bindir}/"
+      system(download)
+    end
   end
-
-  opts.on('-s', '--skip_sync', 'skips emerge --sync') do |value|
-    options[:sync] = false
-  end
-
-  opts.on('-h', '--help', 'print this usage information') do
-    puts opts
-    exit
-  end
-end.parse!
+end
 
 class Location
   def initialize(server_vars)
@@ -111,20 +115,61 @@ class NFS
   end
 end
 
+OptionParser.new do |opts|
+  opts.banner = "Usage: sudo #{$PROGRAM_NAME} [options]"
+
+  opts.on('-i', '--insist', 'Dont --ask') do |value|
+    options[:ask] = false
+  end
+
+  opts.on('-q', '--quiet', 'Non verbose output') do |value|
+    options[:verbose] = false
+  end
+
+  opts.on('-l', '--local', 'Force emerge --sync within LAN') do |value|
+    options[:local] = true
+  end
+
+  opts.on('-p', '--public', 'Force emerge --sync over public WAN') do |value|
+    options[:public] = true
+  end
+
+  opts.on('-s', '--skip_sync', 'skips emerge --sync') do |value|
+    options[:sync] = false
+  end
+
+  opts.on('-V', '--version', 'Version of sys-update.rb') do |value|
+    puts SysUpdate.version
+    exit
+  end
+
+  opts.on('-h', '--help', 'print this usage information') do
+    puts opts
+    exit
+  end
+end.parse!
+
 if __NAME__ = $PROGRAM_NAME
   # check if user is root
   raise 'Must run with sudo' unless Process.uid == 0
 
   emerge_cmd = ARGV.shift
 
+  # Determine location for whether to mount NFS or sync
   loc = Location.new server_vars
   localhost = loc.localhost
   targethost = loc.targethost
   targetuser = loc.targetuser
+
+  targethost = server_vars[:server_domain] if options[:public] == true
+  targethost = server_vars[:server_hostname] if options[:local] == true
   
   e = Emerge.new targethost, targetuser, options
   n = NFS.new
-  
+
+  # Update sys-update.rb if :server_hostname has a new version
+  SysUpdate.version_update(server_vars) if localhost != server_vars[:server_hostname]
+    
   if localhost == server_vars[:server_hostname]
     puts "Localhost is #{localhost}"
     e.emerge_sync if options[:sync]
@@ -132,7 +177,13 @@ if __NAME__ = $PROGRAM_NAME
     e.depclean
   elsif targethost == server_vars[:server_lan_ip]
     puts "#{localhost} is within the network"
-    n.mount_nfs(targethost)
+
+    if options[:public] == true || options[:local] == true
+      e.rsync
+    else
+      n.mount_nfs(targethost)
+    end
+
     e.emerge
     e.depclean
     n.umount_nfs
@@ -143,4 +194,3 @@ if __NAME__ = $PROGRAM_NAME
     e.depclean
   end
 end
-
