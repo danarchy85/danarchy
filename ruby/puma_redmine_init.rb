@@ -23,8 +23,8 @@ OptionParser.new do |opts|
     options[:action] = 'restart'
   end
 
-  opts.on('-k', '--keeprunning', 'Ensure Redmine is Running') do
-    options[:action] = 'keeprunning'
+  opts.on('-k', '--keepalive', 'Ensure Redmine is Running') do
+    options[:action] = 'keepalive'
   end
 
   opts.on('-h', '--help', 'print this usage information') do
@@ -61,14 +61,15 @@ class Redmine
     pidstatus = status
     if pidstatus == false
       puts 'Starting Redmine...'
-      exec_start = IO.popen("cd #{@app_path} ; bundle exec puma -C #{@app_path}/config/puma.rb -e production")
-      exec_start.each { |exec| puts exec }
+      cmd = "cd #{@app_path} ; bundle exec puma -C #{@app_path}/config/puma.rb -e production"
+      IO.popen(cmd) { |io| io.each_line { |l| puts l } }
       puts 'Waiting while Redmine starts...'
-      sleep(15)
+      sleep(10)
       pidstatus = status
     end
 
     return 1 unless pidstatus
+    pidstatus        
   end
 
   def stop
@@ -76,8 +77,7 @@ class Redmine
     return if !pidstatus
     pid = pidstatus[:Pid]
     puts "Stopping Redmine PID: #{pid}..."
-    exec_stop = IO.popen("kill #{pid}")
-    exec_stop.each { |exec| puts exec }
+    IO.popen("kill #{pid}") { |io| io.each_line { |l| puts l } }
     sleep(3)
     if status == false
       puts "Redmine PID: #{pid} has stopped"
@@ -96,17 +96,22 @@ end
 
 r = Redmine.new
 
-puts "Redmine: #{options[:action]}"
+unless %w[status start stop restart keepalive].include? ARGV.first
+  puts "Usage: #{$PROGRAM_NAME} [status|start|stop|restart|keepalive] "
+  exit 1
+end
 
-if options[:action] == 'status'
+case ARGV.first
+when 'status'
   pidstatus = r.status
-elsif options[:action] == 'start'
+  puts 'Redmine is not running' if pidstatus == false
+when 'start'
   r.start
-elsif options[:action] == 'stop'
+when 'stop'
   r.stop
-elsif options[:action] == 'restart'
+when 'restart'
   r.restart
-elsif options[:action] == 'keeprunning'
-  pidstatus = r.status
-  r.restart if pidstatus == false
+when 'keepalive'
+  puts 'Not yet implemented!'
+  # r.keepalive
 end
