@@ -10,7 +10,7 @@ config="config-$version-$HOSTNAME"
 echo "Building kernel for linux-$version :: $kernel"
 
 cd $path/linux
-make
+make -j5
 make modules_install
 
 echo "Installing linux-$version into /boot"
@@ -26,5 +26,5 @@ cp -v $path/linux/arch/x86_64/boot/bzImage /boot/$kernel
 cp -v $path/linux/.config /boot/$config
 
 echo "reemerging modules."
-emerge @module-rebuild
+emerge -q @module-rebuild
 grub-mkconfig -o /boot/grub/grub.cfg
