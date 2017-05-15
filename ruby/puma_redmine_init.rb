@@ -1,38 +1,4 @@
 #!/usr/bin/env ruby
-require 'optparse'
-require 'open3'
-
-options = {}
-
-OptionParser.new do |opts|
-  opts.banner = "Usage: #{$PROGRAM_NAME} [status|start|stop]"
-
-  opts.on('--status', 'View Status of Running Redmine') do
-    options[:action] = 'status'
-  end
-
-  opts.on('--start', 'Start up Redmine') do
-    options[:action] = 'start'
-  end
-
-  opts.on('--stop', 'Stop Redmine if Running') do
-    options[:action] = 'stop'
-  end
-
-  opts.on('--restart', 'Restart Redmine') do
-    options[:action] = 'restart'
-  end
-
-  opts.on('-k', '--keepalive', 'Ensure Redmine is Running') do
-    options[:action] = 'keepalive'
-  end
-
-  opts.on('-h', '--help', 'print this usage information') do
-    puts opts
-    exit
-  end
-end.parse!
-
 # Redmine Init Handler
 class Redmine
   def initialize
@@ -44,7 +10,8 @@ class Redmine
 
   def status
     pid = File.read(@pidfile).chomp if File.exist?(@pidfile)
-    return false unless File.exist?(@pidfile) && File.exist?("/proc/#{pid}/status")
+    return false if !pid
+    # return false unless File.exist?(@pidfile) && File.exist?("/proc/#{pid}/status")
     pidstatus = {}
     File.open("/proc/#{pid}/status").each do |sl|
       k = sl.split(' ')[0].sub(':', '')
@@ -52,8 +19,6 @@ class Redmine
       pidstatus[:"#{k}"] = v
     end
 
-    puts 'Redmine is not running' if !pidstatus
-    puts "Redmine is running as PID: #{pidstatus[:Pid]}" if pidstatus
     return pidstatus if pidstatus[:Pid] == pid
   end
 
@@ -90,28 +55,77 @@ class Redmine
   def restart
     puts 'Restarting Redmine...'
     stop
-    start
+    pidstatus = start
+
+    if pidstatus
+      puts "Redmine is running as PID: #{pidstatus[:Pid]}"
+    else
+      puts 'Redmine failed to restart!'
+    end
+  end
+
+  def monitor
+    log = "#{@app_path}/log/puma_redmine_init.log"
+    t = Time.new
+    restarts = 0
+
+    fork do
+      $stdin.reopen '/dev/null'
+      $stdout.reopen log
+      $stderr.reopen log
+      trap(:HUP) do
+        puts 'Ignoring SIGHUP'
+      end
+      trap(:TERM) do
+        puts 'Exiting Puma/Redmine'
+        exit
+      end
+      loop do
+        pidstatus = status
+
+        if pidstatus == false
+          start
+          restarts += 1
+
+          File.open(log, 'a') do |log|
+            entry = "Restarted Redmine: #{t.strftime("%Y/%m/%d %H:%M")}"
+            log.puts entry
+          end
+        else
+          File.open(log, 'a') do |log|
+            entry = "Redmine is running: #{t.strftime("%Y/%m/%d %H:%M")}"
+            log.puts entry
+          end
+
+          sleep(900)
+        end
+      end
+    end
   end
 end
 
 r = Redmine.new
 
-unless %w[status start stop restart keepalive].include? ARGV.first
-  puts "Usage: #{$PROGRAM_NAME} [status|start|stop|restart|keepalive] "
+unless %w[status start stop restart monitor].include? ARGV.first
+  puts "Usage: #{$PROGRAM_NAME} [status|start|stop|restart|monitor] "
   exit 1
 end
 
 case ARGV.first
 when 'status'
   pidstatus = r.status
-  puts 'Redmine is not running' if pidstatus == false
+
+  if pidstatus
+    puts "Redmine is running as PID: #{pidstatus[:Pid]}"
+  else
+    puts 'Redmine is not running!'
+  end
 when 'start'
   r.start
 when 'stop'
   r.stop
 when 'restart'
   r.restart
-when 'keepalive'
-  puts 'Not yet implemented!'
-  # r.keepalive
+when 'monitor'
+  r.monitor
 end
