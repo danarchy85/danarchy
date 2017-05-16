@@ -66,7 +66,6 @@ class Redmine
 
   def monitor
     log = "#{@app_path}/log/puma_redmine_init.log"
-    t = Time.new
     restarts = 0
 
     fork do
@@ -81,6 +80,7 @@ class Redmine
         exit
       end
       loop do
+        t = Time.now.strftime("%Y/%m/%d %H:%M")
         pidstatus = status
 
         if pidstatus == false
@@ -88,12 +88,12 @@ class Redmine
           restarts += 1
 
           File.open(log, 'a') do |log|
-            entry = "Restarted Redmine: #{t.strftime("%Y/%m/%d %H:%M")}"
+            entry = "Restarted Redmine: #{t}"
             log.puts entry
           end
         else
           File.open(log, 'a') do |log|
-            entry = "Redmine is running: #{t.strftime("%Y/%m/%d %H:%M")}"
+            entry = "Redmine is running: #{t}"
             log.puts entry
           end
 
