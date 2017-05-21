@@ -3,24 +3,25 @@ require 'optparse'
 require 'socket'
 
 server_vars = {
-  server_hostname: 'danarchy',
-  server_domain: 'danarchy.me',
-  server_lan_ip: '10.0.1.13',
-  server_user: 'dan',
-  sys_update_path: '/danarchy/ruby/sys-update.rb',
+  server_hostname: 'local_hostname',
+  server_domain: 'FQDN',
+  server_lan_ip: 'local_IP',
+  server_user: 'user with access to /usr/portage',
+  sys_update_path: '/server/path/to/sys-update.rb',
 }
 
 options = {
-  ask: true,
   sync: true,
+  verbose: true,
+  ask: true,
+  depclean: false,
   local: false,
   public: false,
-  verbose: true,
 }
 
 class SysUpdate
   def self.version
-    version = '1.2.3'
+    version = '1.2.5'
   end
   
   def self.version_update(server_vars)
@@ -67,50 +68,54 @@ end
 
 class Emerge
   def initialize(targethost, targetuser, options)
-    @targethost = targethost
-    @targetuser = targetuser
-    global_opts = []
-    global_opts.push('--ask') if options[:ask]
-    global_opts.push('--verbose') if options[:verbose]
-    @esync_opts = %Q[--quiet] if !options[:verbose]
-    @rsync_opts = %Q[--verbose] if options[:verbose]
-    @global_opts = global_opts.join(' ')
+    (@targethost, @targetuser) = targethost, targetuser
+    @options = options
   end
   
   def emerge_sync
-    puts "Running: emerge --sync #{@esync_opts}"
-    system("emerge --sync #{@esync_opts}")
+    opts = '--quiet' unless @options[:verbose]
+    cmd = "emerge --sync #{opts}"
+    puts "Running: #{cmd}"
+    system(cmd)
   end
 
   def rsync
-    rsync_opts = %Q[--recursive --links --perms --times --devices --delete --timeout=300 --exclude=distfiles/ --exclude=packages/]
-    puts "Running: rsync #{rsync_opts} #{@rsync_opts} #{@targetuser}@#{@targethost}:/usr/portage /usr/portage"
-    system("rsync #{@rsync_opts} #{rsync_opts} #{@targetuser}@#{@targethost}:/usr/portage/ /usr/portage/")
+    opts = %w[--recursive --links --perms --times --devices --delete --timeout=300 --exclude=distfiles/ --exclude=packages/]
+    opts.push('--verbose') if @options[:verbose]
+    cmd = "rsync #{opts.join(' ')} #{@targetuser}@#{@targethost}:/usr/portage /usr/portage"
+    puts "Running: #{cmd}"
+    system(cmd)
   end
 
   def emerge
-    emerge_opts = %Q[--update --deep --newuse --with-bdeps=y @world]
-    puts "Running: emerge #{@global_opts} #{emerge_opts}"
-    system("emerge #{@global_opts} #{emerge_opts}")
+    opts = %w[--update --deep --newuse --with-bdeps=y @world]
+    opts.push('--verbose') if @options[:verbose]
+    opts.push('--ask') if @options[:ask]
+    cmd = "emerge #{opts.join(' ')}"
+    puts "Running: #{cmd}"
+    system(cmd)
   end
 
   def depclean
-    depclean_opts = %Q[--depclean]
-    puts "Running: emerge #{depclean_opts} #{@global_opts}"
-    system("emerge #{depclean_opts} #{@global_opts}")
+    opts = %w[--depclean]
+    opts.push('--verbose') if @options[:verbose]
+    opts.push('--ask') if @options[:ask]
+    cmd = "emerge #{opts.join(' ')}"
+    puts "Running: #{cmd}"
+    system(cmd)
   end
 end
 
 class NFS
   def mount_nfs(targethost)
-    puts "Mounting: #{targethost}:/usr/portage"
-    system("mount -t nfs #{targethost}:/usr/portage /usr/portage")
+    puts "Mounting: #{targethost}:/usr/portage/distfiles"
+    system("mount -t nfs #{targethost}:/usr/portage /usr/portage/distfiles")
   end
 
   def umount_nfs
-    unless File.read('/etc/fstab').include?('/usr/portage')
-      puts "Unmounting: /usr/portage"
-      system('umount /usr/portage')
+    unless File.read('/etc/fstab').include?('/usr/portage/distfiles')
+      puts "Unmounting: /usr/portage/distfiles"
+      system('umount /usr/portage/distfiles')
     end
   end
 end
@@ -118,8 +123,12 @@ end
 OptionParser.new do |opts|
   opts.banner = "Usage: sudo #{$PROGRAM_NAME} [options]"
 
-  opts.on('-i', '--insist', 'Dont --ask') do |value|
+  opts.on('-g', '--go', 'Don\'t --ask, just go!') do |value|
     options[:ask] = false
+  end
+
+  opts.on('-d', '--depclean', 'Run --depclean after emerge') do |value|
+    options[:depclean] = true
   end
 
   opts.on('-q', '--quiet', 'Non verbose output') do |value|
@@ -153,8 +162,6 @@ if __NAME__ = $PROGRAM_NAME
   # check if user is root
   raise 'Must run with sudo' unless Process.uid == 0
 
-  emerge_cmd = ARGV.shift
-
   # Determine location for whether to mount NFS or sync
   loc = Location.new server_vars
   localhost = loc.localhost
@@ -174,23 +181,18 @@ if __NAME__ = $PROGRAM_NAME
     puts "Localhost is #{localhost}"
     e.emerge_sync if options[:sync]
     e.emerge
-    e.depclean
+    e.depclean if options[:depclean]
   elsif targethost == server_vars[:server_lan_ip]
     puts "#{localhost} is within the network"
-
-    if options[:public] == true || options[:local] == true
-      e.rsync
-    else
-      n.mount_nfs(targethost)
-    end
-
+    e.rsync if options[:sync]
+    n.mount_nfs(targethost)
     e.emerge
-    e.depclean
+    e.depclean if options[:depclean]
     n.umount_nfs
   else
     puts "#{localhost} is outside of the network"
-    e.rsync unless !options[:sync]
+    e.rsync if options[:sync]
     e.emerge
-    e.depclean
+    e.depclean if options[:depclean]
   end
 end
