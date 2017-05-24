@@ -82,7 +82,7 @@ class Emerge
   def rsync
     opts = %w[--recursive --links --perms --times --devices --delete --timeout=300 --exclude=distfiles/ --exclude=packages/]
     opts.push('--verbose') if @options[:verbose]
-    cmd = "rsync #{opts.join(' ')} #{@targetuser}@#{@targethost}:/usr/portage /usr/portage"
+    cmd = "rsync #{opts.join(' ')} #{@targetuser}@#{@targethost}:/usr/portage/ /usr/portage/"
     puts "Running: #{cmd}"
     system(cmd)
   end
