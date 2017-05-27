@@ -10,8 +10,7 @@ class Redmine
 
   def status
     pid = File.read(@pidfile).chomp if File.exist?(@pidfile)
-    return false if !pid
-    # return false unless File.exist?(@pidfile) && File.exist?("/proc/#{pid}/status")
+    return false unless File.exist?(@pidfile) && File.exist?("/proc/#{pid}/status")
     pidstatus = {}
     File.open("/proc/#{pid}/status").each do |sl|
       k = sl.split(' ')[0].sub(':', '')
