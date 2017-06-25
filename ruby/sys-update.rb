@@ -6,8 +6,9 @@ server_vars = {
   server_hostname: 'local_hostname',
   server_domain: 'FQDN',
   server_lan_ip: 'local_IP',
-  server_user: 'user with access to /usr/portage',
+  server_user: 'user with read access to server:/usr/portage',
   sys_update_path: '/server/path/to/sys-update.rb',
+  ssh_key_path: '/home/user/.ssh/id_ed25519',
 }
 
 options = {
@@ -21,7 +22,7 @@ options = {
 
 class SysUpdate
   def self.version
-    version = '1.2.5'
+    version = '1.2.7'
   end
   
   def self.version_update(server_vars)
@@ -67,8 +68,8 @@ class Location
 end
 
 class Emerge
-  def initialize(targethost, targetuser, options)
-    (@targethost, @targetuser) = targethost, targetuser
+  def initialize(targethost, targetuser, ssh_exec, options)
+    (@targethost, @targetuser, @ssh_exec) = targethost, targetuser, ssh_exec
     @options = options
   end
   
@@ -82,6 +83,8 @@ class Emerge
   def rsync
     opts = %w[--recursive --links --perms --times --devices --delete --timeout=300 --exclude=distfiles/ --exclude=packages/]
     opts.push('--verbose') if @options[:verbose]
+    opts.push("--rsh #{@ssh_exec}")
+
     cmd = "rsync #{opts.join(' ')} #{@targetuser}@#{@targethost}:/usr/portage/ /usr/portage/"
     puts "Running: #{cmd}"
     system(cmd)
@@ -108,14 +111,16 @@ end
 
 class NFS
   def mount_nfs(targethost)
-    puts "Mounting: #{targethost}:/usr/portage/distfiles"
-    system("mount -t nfs #{targethost}:/usr/portage /usr/portage/distfiles")
+    path = '/usr/portage/distfiles'
+    puts "Mounting: #{targethost}:#{path}"
+    system("mount -t nfs #{targethost}:#{path} #{path}")
   end
 
   def umount_nfs
-    unless File.read('/etc/fstab').include?('/usr/portage/distfiles')
-      puts "Unmounting: /usr/portage/distfiles"
-      system('umount /usr/portage/distfiles')
+    path = '/usr/portage/distfiles'
+    unless File.read('/etc/fstab').include?(path)
+      puts "Unmounting: #{path}"
+      system("umount #{path}")
     end
   end
 end
@@ -167,11 +172,12 @@ if __NAME__ = $PROGRAM_NAME
   localhost = loc.localhost
   targethost = loc.targethost
   targetuser = loc.targetuser
+  ssh_exec = "\'ssh -i #{server_vars[:ssh_key_path]}\'"
 
   targethost = server_vars[:server_domain] if options[:public] == true
   targethost = server_vars[:server_hostname] if options[:local] == true
   
-  e = Emerge.new targethost, targetuser, options
+  e = Emerge.new targethost, targetuser, ssh_exec, options
   n = NFS.new
 
   # Update sys-update.rb if :server_hostname has a new version
