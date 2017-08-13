@@ -23,7 +23,7 @@ options = {
 
 class SysUpdate
   def self.version
-    version = '1.2.8'
+    version = '1.2.9'
   end
   
   def self.version_update(server_vars)
@@ -192,7 +192,6 @@ if __NAME__ = $PROGRAM_NAME
   elsif targethost == server_vars[:server_lan_ip]
     puts "#{localhost} is within the network"
     n.mount_nfs(targethost)
-    e.rsync if options[:sync]
     e.emerge
     e.depclean if options[:depclean]
     n.umount_nfs
