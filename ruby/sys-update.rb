@@ -3,12 +3,13 @@ require 'optparse'
 require 'socket'
 
 server_vars = {
-  server_hostname: 'danarchy',
-  server_domain: 'danarchy.me',
-  server_lan_ip: '10.0.1.13',
-  server_user: 'dan',
-  sys_update_path: '/danarchy/ruby/sys-update.rb',
-  ssh_key_path: '/home/dan/.ssh/id_ed25519',
+  server_hostname: 'local_hostname',
+  server_domain: 'FQDN',
+  server_lan_ip: 'local_IP',
+  server_user: 'user with read access to server:/usr/portage',
+  sys_update_path: '/server/path/to/sys-update.rb',
+  ssh_key_path: '/home/user/.ssh/id_ed25519',
+  
 }
 
 options = {
