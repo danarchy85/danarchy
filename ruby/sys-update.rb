@@ -8,8 +8,7 @@ server_vars = {
   server_lan_ip: 'local_IP',
   server_user: 'user with read access to server:/usr/portage',
   sys_update_path: '/server/path/to/sys-update.rb',
-  ssh_key_path: '/home/user/.ssh/id_ed25519',
-  
+    ssh_key_path: '/home/user/.ssh/id_ed25519',
 }
 
 options = {
@@ -23,7 +22,7 @@ options = {
 
 class SysUpdate
   def self.version
-    version = '1.2.9'
+    version = '1.2.10'
   end
   
   def self.version_update(server_vars)
@@ -112,13 +111,13 @@ end
 
 class NFS
   def mount_nfs(targethost)
-    path = '/usr/portage/distfiles'
+    path = '/usr/portage'
     puts "Mounting: #{targethost}:#{path}"
     system("mount -t nfs #{targethost}:#{path} #{path}")
   end
 
   def umount_nfs
-    path = '/usr/portage/distfiles'
+    path = '/usr/portage'
     unless File.read('/etc/fstab').include?(path)
       puts "Unmounting: #{path}"
       system("umount #{path}")
