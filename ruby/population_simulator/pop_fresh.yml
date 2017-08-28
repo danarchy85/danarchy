@@ -1,0 +1,15 @@
+---
+:male:
+  1:
+    :sex: male
+    :age: 30
+    :native: 1
+    :eye: green
+    :hair: brown
+:female:
+  1:
+    :sex: female
+    :age: 32
+    :native: 1
+    :eye: brown
+    :hair: brown
