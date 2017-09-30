@@ -6,7 +6,6 @@ abort('Need an Owncloud log file!') if !log || !File.file?(log)
 log_arr = File.readlines(log)
 
 log_arr.each do |log|
-  # JSON.parse(JSON.parse(log)['message'].gsub('Exception: ', '')).each do |key, value|
   JSON.parse(log).each do |key, value|
     if key != 'message'
       printf("%-15s %-5s\n", key, value)
