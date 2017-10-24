@@ -22,11 +22,11 @@ options = {
 
 class SysUpdate
   def self.version
-    version = '1.2.11'
+    version = '1.2.12'
   end
   
   def self.version_update(server_vars)
-    ssh_key = File.join('/home', server_vars[:server_user], '/.ssh/id_ed25519')
+    ssh_key = server_vars[:ssh_key_path]
     @connection = "#{server_vars[:server_user]}@#{server_vars[:server_domain]}"
     @sys_update_path = server_vars[:sys_update_path]
     latest = `ssh -i #{ssh_key} #{@connection} /usr/bin/ruby #{@sys_update_path} --version`
