@@ -22,7 +22,7 @@ options = {
 
 class SysUpdate
   def self.version
-    version = '1.2.12'
+    version = '1.2.13'
   end
   
   def self.version_update(server_vars)
@@ -118,7 +118,7 @@ class NFS
 
   def umount_nfs
     path = '/usr/portage'
-    unless File.read('/etc/fstab').include?(path)
+    unless File.read('/etc/fstab').lines.grep(/\/usr\/portage.*defaults,auto/)
       puts "Unmounting: #{path}"
       system("umount #{path}")
     end
@@ -165,7 +165,7 @@ end.parse!
 
 if __NAME__ = $PROGRAM_NAME
   # check if user is root
-  raise 'Must run with sudo' unless Process.uid == 0
+  abort('Must run with sudo') unless Process.uid == 0
 
   # Determine location for whether to mount NFS or sync
   loc = Location.new server_vars
