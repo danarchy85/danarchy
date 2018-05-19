@@ -22,7 +22,7 @@ options = {
 
 class SysUpdate
   def self.version
-    version = '1.2.14'
+    version = '1.2.15'
   end
   
   def self.version_update(server_vars)
@@ -119,9 +119,9 @@ class NFS
   def umount_nfs
     path = '/usr/portage'
     File.readlines('/etc/fstab').grep(/\/usr\/portage/).each do |l|
-      if l.grep(/defaults,auto/)
+      if l.include?('defaults,auto')
         puts "Leaving #{path} mounted."
-      elsif l.grep(/defaults,noauto/)
+      elsif l.include?('defaults,noauto')
         puts "Unmounting: #{path}"
         system("umount -v #{path}")
       else
