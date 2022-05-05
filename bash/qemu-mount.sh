@@ -13,9 +13,13 @@ function load_nbd_module() {
     modprobe nbd
 }
 
+function unload_nbd_module() {
+    rmmod nbd
+}
+
 function connect_device() {
     echo "Connecting ${image} to /dev/${nbd}"
-    qemu-nbd -c /dev/${nbd} --read-only "${image}"
+    qemu-nbd -c /dev/${nbd} "${image}" # --read-only
 }
 
 function disconnect_device() {
@@ -45,6 +49,7 @@ function main() {
             connect_device
         elif [[ ${action} == 'disconnect' ]]; then
             disconnect_device
+            unload_nbd_module
         fi
     fi
 }
