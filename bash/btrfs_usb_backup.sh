@@ -63,7 +63,7 @@ run_backup() {
     for dataset in ${datasets}; do
         echo " |_ Rsyncing: /${dataset} => ${mount}/${dataset}"
 	/usr/bin/rsync -Havu --delete --delete-excluded \
-                       --exclude=.cache --exclude=*Cache \
+                       --exclude=*cache* --exclude=*Cache* \
                        /${dataset}/ ${mount}/${dataset}/ \
                        > ${logdir}/rsync-${dataset}.btrfs_usb_backup.log 2>&1
     done
